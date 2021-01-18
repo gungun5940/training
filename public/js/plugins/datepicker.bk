@@ -1,0 +1,408 @@
+	/**/
+	/* Datepicker */
+	/**/
+	var DatePicker = {
+		init: function (options, elem) {
+			var self = this;
+
+			self.$elem = $( elem );
+			self.options = $.extend( {}, $.fn.datepicker.options, options );
+
+			self.setElem();
+			self.setData();
+
+			self.Events();
+
+			self.display();
+
+			if( typeof self.options.onComplete === 'function' ){
+				self.options.onComplete( self.calendar.selectedDate );
+			}
+		},
+		setElem: function () {
+			var self = this;
+
+			self.$input = $('<input>', {
+				class: 'hiddenInput',
+				type: 'hidden',
+				name: self.$elem.attr('name')
+			});
+			
+			// self.$input.addClass( self.$elem.attr('class') );
+			self.$display = $('<span>', {class: 'btn-text'});
+			self.original = self.$elem;
+
+			var placeholder = $('<div/>', {class: 'uiPopover'});
+			self.$elem.replaceWith(placeholder);
+            self.$elem = placeholder;
+			
+			self.$btn = $('<a>', {class: 'btn btn-box btn-toggle'}).append( self.$display );
+
+			if( !self.options.icon ){
+				self.$btn.append( $('<i/>', {class: 'img mls icon-angle-down'}) );
+			}
+
+			self.$elem.append( self.$btn, self.$input );
+		},
+		setData: function () {
+			var self = this;
+
+			self.is_focus = false;
+			if( self.original.val()!='' ){
+				var val = self.original.val();
+				var rs = val.split("-");
+				if( rs.length==3 ){
+					self.options.selectedDate = new Date( parseInt(rs[0]), parseInt(rs[1])-1, parseInt(rs[2]) );
+					self.options.selectedDate.setHours(0, 0, 0, 0);
+				}
+			}
+			self.options.selectedDate.setHours(0, 0, 0, 0);
+
+			self.is_open = false;
+
+			var today = new Date(); today.setHours(0, 0, 0, 0);
+			self.calendar = {
+				$elem: $('<div>', {class: 'uiContextualPositioner'}),
+				theDate: new Date( today ),
+				selectedDate: new Date( self.options.selectedDate ),
+				lists: []
+			};
+			
+			self.$calendar = $('<div>', {class: 'toggleFlyout calendarGridTableSmall'});
+			self.calendar.$elem.html( self.$calendar );
+		},
+
+		Events: function () {
+			var self = this;
+
+			self.$btn.click(function(e){
+
+				if( self.is_open ){
+					self.hide();
+				}
+				else{
+					self.updateCalendar();
+					self.show();
+					e.stopPropagation();
+				}
+			});
+
+			$('html').on('click', function() {
+
+				if( !self.is_focus && self.is_open ){
+					self.hide();
+				}	
+			});
+
+			self.calendar.$elem.mouseenter(function () {
+				self.is_focus = true;
+			}).mouseleave( function () {
+				self.is_focus = false;
+			} );
+
+			self.calendar.$elem.delegate('.prev,.next','click', function (e) {
+				
+				var offset = $(this).hasClass("prev") ? -1 : 1;
+				var newDate = new Date( self.calendar.theDate );
+				newDate.setMonth( newDate.getMonth() + offset);
+				self.calendar.theDate = newDate;
+
+				self.updateCalendar();
+
+				e.stopPropagation();
+			});
+
+			self.calendar.$elem.delegate('td[data-date]','click', function (e) {
+
+				self.selected(  $(this).attr('data-date') );
+				self.display();
+				self.hide();
+			});
+
+			self.calendar.$elem.bind('mousewheel', function(e){
+
+				if( self.is_loading ) return false;
+
+				var offset = e.originalEvent.wheelDelta /120 > 0 ? -1 : 1;
+				var newDate = new Date( self.calendar.theDate );
+				newDate.setMonth( newDate.getMonth() + offset);
+				self.calendar.theDate = newDate;
+
+				self.updateCalendar();
+			});
+		},
+
+		setCalendar: function () {
+			var self = this;
+			// var startDate = new Date( theDate );
+			// startDate.setDate( 1 );
+
+			var today = new Date(); today.setHours(0, 0, 0, 0);
+
+			var firstDate = new Date( self.calendar.theDate );
+	        firstDate.setDate(1);
+	        var firstTime = firstDate.getTime();
+			var lastDate = new Date(firstDate);
+	        lastDate.setMonth(lastDate.getMonth() + 1);
+	        lastDate.setDate(0);
+	        var lastTime = lastDate.getTime();
+	        var lastDay = lastDate.getDate();
+
+	        // Calculate the last day in previous month
+	        var prevDateLast = new Date(firstDate);
+	        prevDateLast.setDate(0);
+	        var prevDateLastDay = prevDateLast.getDay();
+	        var prevDateLastDate = prevDateLast.getDate();
+
+	        var prevweekDay = self.options.weekDayStart;
+	        prevweekDay = prevweekDay>prevDateLastDay
+				? 7-prevweekDay
+				: prevDateLastDay-prevweekDay;
+
+			self.calendar.lists = [];
+			for (var y = 0, i = 0; y < 7; y++){
+
+				var row = [];
+				var weekInMonth = false;
+
+				for (var x = 0; x < 7; x++, i++) {
+					var p = ((prevDateLastDate - prevweekDay ) + i);
+
+					var call = {};
+					var n = p - prevDateLastDate;
+					call.date = new Date( self.calendar.theDate ); 
+					call.date.setHours(0, 0, 0, 0); 
+					call.date.setDate( n );
+
+					// If value is outside of bounds its likely previous and next months
+	            	if (n >= 1 && n <= lastDay){
+	            		weekInMonth = true;
+
+	            		if( today.getTime()==call.date.getTime()){
+	                    	call.today = true;
+	                    }
+
+	                    if( self.calendar.selectedDate.getTime()==call.date.getTime() ){
+	                    	call.selected = true;
+	                    }
+	            	}
+	            	else{
+	            		call.noday = true;
+	            	}
+
+	            	/*if( self.calendar.startDate ){
+                    	if( self.date.startDate.getTime()>call.date.getTime() ){
+                    		call.empty = true;
+                    	}
+                    }*/
+                    
+					row.push(call);
+				}
+
+				if( row.length>0 && weekInMonth ){
+					self.calendar.lists.push(row);
+				}
+			}
+
+			self.calendar.header = [];
+			for (var x=0,i=self.options.weekDayStart; x<7; x++, i++) {
+				if( i==7 ) i=0;
+				self.calendar.header.push({
+	        		key: i,
+	        		text: Datelang.day( i, 'short', self.options.lang )
+	        	});
+			};
+		},
+		updateCalendar: function () {
+			var self = this;
+
+			self.is_loading = true;
+			self.setCalendar();
+
+			// title
+			var year = self.calendar.theDate.getFullYear();
+			if( self.options.lang=='th' ){
+				year = year+543;
+			}
+
+			var month = Datelang.month( self.calendar.theDate.getMonth(), self.options.format, self.options.lang );
+
+			var $title = $('<thead>').html( $("<tr>", {class: 'title'}).append( 
+				  $('<td>', {class: 'title', colspan: 5, text: month + " " + year })
+				, $('<td>', {class: 'prev'}).append( $('<i/>', {class:'icon-angle-left'}) )
+				, $('<td>', {class: 'next'}).append( $('<i/>', {class:'icon-angle-right'}) )
+			) );
+
+			// header
+			var $header = $("<tr>", {class: 'header'});
+			$.each( self.calendar.header, function(i, obj){
+				$header.append( $('<th>', {text: obj.text}) );
+			});
+			$thead = $('<thead/>').html( $header );
+
+			// body
+			var $tbody = $('<tbody>');
+			$.each(self.calendar.lists, function (i, row) {
+				$tr = $('<tr>');
+				$.each( row, function(j, call){
+
+					call.cls = "";
+					// call.date/
+
+					var m = call.date.getMonth()+1;
+					m = m < 10 ? '0'+m:m;
+
+					var d = call.date.getDate();
+					d = d < 10 ? '0'+d:d;
+
+					var datestr = call.date.getFullYear()+"-"+ m +"-"+d;
+
+					if( self.options.start ){
+
+						if( self.options.start.getTime() == call.date.getTime() ){
+							call.cls += ' select-start';
+						}
+
+						if( self.options.start.getTime() > call.date.getTime() ){
+							call.overtime = true;
+						}
+					}
+
+					if( self.options.end ){
+
+						if( self.options.end.getTime() == call.date.getTime() ){
+							call.cls += ' select-end';
+						}
+
+						if( self.options.end.getTime() < call.date.getTime() ){
+							call.overtime = true;
+						}
+					}
+
+					$tr.append( 
+						$('<td>',{'data-date': datestr })
+
+							.addClass( call.empty?'empty':'' )
+							.addClass( call.today?'today':'' )
+							.addClass( call.selected?'selected':'' )
+							.addClass( call.noday?'noday':'' )
+							.addClass( call.overtime?'overtime':'' )
+							.addClass( call.cls )
+							// .addClass( call.date.getDay()==6 || call.date.getDay()==0?'weekHoliday':'' )
+							.html( $('<span>', { text: call.date.getDate() }) )
+					);
+				});
+
+				$tbody.append( $tr );			
+			});
+
+			self.$calendar.empty()
+				.html( $('<table/>', { class: 'calendarGridTable', cellspacing: 0, cellpadding: 0 })
+				.addClass( self.options.theme )
+				.append( $title, $thead, $tbody )
+			);
+
+			self.is_loading = false;
+		},
+
+		hide: function () {
+			var self = this;
+
+			self.is_focus = false;
+			self.is_open = false;
+
+			self.calendar.$elem.removeClass('open'); //.remove();
+
+			self.calendar.theDate = new Date( self.calendar.selectedDate );
+			/*self.timeout = setTimeout( function () {
+				self.calendar.$elem.remove();
+			}, 1000);*/
+		},
+		show: function () {
+			var self = this;
+
+			self.is_open = true;
+
+			$('body').append( self.calendar.$elem );
+			self.getOffset();
+
+			self.calendar.$elem.addClass('open');
+			//
+		},
+		getOffset: function(){
+			var self = this;
+			
+			var $calendar = self.calendar.$elem;
+			if( $calendar.hasClass('uiContextualAbove') ){
+				$calendar.removeClass('uiContextualAbove');
+			}
+			
+			var outer = $(document).height()<$(window).height()?$(window):$(document);
+
+			var offset = self.$elem.offset(),
+				outerWidth = $(window).width(),
+				outerHeight = outer.height();
+
+			var position = offset;
+			
+			position.top += self.$elem.outerHeight();
+			
+			var innerWidth = position.left+$calendar.outerWidth();
+			if( $('html').hasClass('sidebarMode') ){
+				innerWidth+= 301;
+			}
+
+			if( innerWidth>outerWidth ){
+				position.left = offset.left-$calendar.outerWidth()+self.$elem.outerWidth();
+			}
+			
+			var innerHeight = position.top+$calendar.outerHeight();
+			if( innerHeight>outerHeight ){
+				position.top = offset.top-$calendar.outerHeight()-self.$elem.outerHeight();
+				$calendar.addClass('uiContextualAbove'); 
+			}
+
+			$calendar.css( position );
+		},
+
+		selected: function ( date ) {
+			var self = this;
+
+			var rs = date.split("-");
+			self.calendar.selectedDate = new Date( rs[0], (rs[1]-1), rs[2] );
+			self.calendar.selectedDate.setHours(0, 0, 0, 0);
+
+			if( typeof self.options.onSelected === 'function'){
+				self.options.onSelected( self.calendar.selectedDate );
+			}
+
+			if(typeof self.options.onChange === 'function'){
+				self.options.onChange( self.calendar.selectedDate );
+			}
+		},
+
+		display: function () {
+			var self = this;
+
+			self.$display.text( Datelang.fulldate( self.calendar.selectedDate, self.options.format, self.options.lang, self.options.displayFullYear ) );
+			self.$input.val( PHP.dateJStoPHP( self.calendar.selectedDate ) );
+		}
+	}
+	$.fn.datepicker = function( options ) {
+		return this.each(function() {
+			var $this = Object.create( DatePicker );
+			$this.init( options, this );
+			$.data( this, 'datepicker', $this );
+		});
+	};
+	$.fn.datepicker.options = {
+		lang: 'th',
+		selectedDate: new Date(),
+		start: null,
+		end: null,
+		weekDayStart: 0,
+		format: 'normal',
+		theme: '',
+		onSelected: function () { },
+		displayFullYear: true
+	};

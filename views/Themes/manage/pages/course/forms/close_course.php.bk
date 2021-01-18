@@ -1,0 +1,29 @@
+<?php
+
+$arr['title'] = "ยืนยันการปิดหลักสูตรรหัส Tech{$this->item['code']}";
+
+$arr['form'] = '<form class="js-submit-form" action="'.URL.'course/opencourse"></form>';
+$arr['hiddenInput'][] = array('name'=>'id','value'=>$this->item['id']);
+$arr['hiddenInput'][] = array('name'=>'open_status','value'=>0);
+$arr['hiddenInput'][] = array('name'=>'open_id','value'=>$this->open['id']);
+// $arr['body'] = "คุณต้องการปิดหลักสูตร <span class=\"fwb\">\"{$this->item['name_th']}\" </span> ใช่หรือไม่?";
+$arr['body'] = '<div class="clearfix pas pam uiBoxWhite">
+					<div class="tac">
+						<span class="fwb">คุณต้องการ <span class="fcr">ปิดหลักสูตร</span> รหัส : Tech'.$this->item['code'].' ใช่หรือไม่ ?</span>
+					</div>
+					<div class="fwb mts"><i class="icon-book"></i> ข้อมูลหลักสูตร</div>
+					<ul>
+						<li><span class="fwb">ชื่อ (ไทย) : </span>'.$this->item['name_th'].'</li>
+						<li><span class="fwb">ชื่อ (อังกฤษ) : </span>'.$this->item['name_en'].'</li>
+						<li><span class="fwb">ปีที่เปิดหลักสูตร : </span>'.$this->open['startyear'].'</li>
+						<li><span class="fwb">ปีที่สิ้นสุดหลักสูตร : </span>'.$this->open['endyear'].'</li>
+						<li><span class="fwb">ระยะเวลาที่กำหนด : </span>'.$this->fn->q('time')->str_event_date($this->open['startdate'], $this->open['enddate'], true).'</li>
+					</ul>
+				</div>';
+
+$arr['button'] = '<button type="submit" class="btn btn-danger btn-submit"><span class="btn-text">ปิดหลักสูตร</span></button>';
+$arr['bottom_msg'] = '<a class="btn" role="dialog-close"><span class="btn-text">ยกเลิก</span></a>';
+
+$arr['width'] = 500;
+
+echo json_encode($arr);
